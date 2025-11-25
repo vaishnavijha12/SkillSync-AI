@@ -2,10 +2,3 @@ This is a test file.
 Checking auto push.
 AutoAuto push test content
  push test content
-hiim vaishnavi
-hi
-text
-hi there vvv
-jj
-helllllo hiii
-vaishnavi
