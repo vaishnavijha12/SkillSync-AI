@@ -2,4 +2,4 @@
 Checking auto commit
 
 AutoAuto push testcontent
- push test content
+ push test content to repo
