@@ -1,13 +1,2 @@
-<<<<<<< HEAD
-This is a test file.
-Checking auto push.
-AutoAuto push test content
- push test content
-hhh
-=======
-.This is a test file.
-Checking auto commit
 
-AutoAuto push testcontent
- push test content to repo
->>>>>>> 6af02221b15dc21bcb468644adcb13e52d07319d
+
