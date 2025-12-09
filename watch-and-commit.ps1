@@ -1,60 +1,77 @@
-# watch-and-commit.ps1
-# Usage: .\watch-and-commit.ps1 -Path . -Interval 5
-
-param(
+﻿param(
     [string]$Path = ".",
     [int]$Interval = 5
 )
 
 Set-Location $Path
 
-if (-not (Test-Path .git)) {
-    Write-Error "Not a git repo. Run 'git init' first."
+if (-not (Test-Path ".git")) {
+    Write-Host "Not a git repository. Run 'git init' first." -ForegroundColor Red
     exit 1
 }
 
-# compute initial snapshot
 function Get-Snapshot {
     Get-ChildItem -Recurse -File -Force -ErrorAction SilentlyContinue |
-      Where-Object { $_.FullName -notmatch "\\.git\\" } |
-      Select-Object @{Name="Path";Expression={$_.FullName}}, @{Name="Hash";Expression={(Get-FileHash $_.FullName -Algorithm MD5).Hash}}
+        Where-Object { $_.FullName -notmatch "\\.git\\" } |
+        ForEach-Object {
+            [PSCustomObject]@{
+                Path = $_.FullName
+                Hash = (Get-FileHash $_.FullName -Algorithm MD5).Hash
+            }
+        }
 }
 
 $snap = Get-Snapshot
 
-Write-Host "Watching $((Get-Location).Path) — interval $Interval sec. Ctrl+C to stop."
+Write-Host "Watching $((Get-Location).Path) every $Interval seconds..." -ForegroundColor Cyan
+Write-Host "Press CTRL + C to stop."
 
 while ($true) {
     Start-Sleep -Seconds $Interval
-    $new = Get-Snapshot
 
-    $joined = @{}
-    foreach ($n in $new) { $joined[$n.Path] = $n.Hash }
+    $newSnap = Get-Snapshot
     $changed = $false
 
-    # check added/changed
-    foreach ($k in $joined.Keys) {
-        if (-not $snap.Path -contains $k) { $changed = $true; break }
-        $old = ($snap | Where-Object { $_.Path -eq $k }).Hash
-        if ($old -ne $joined[$k]) { $changed = $true; break }
+    $newPaths = $newSnap.Path
+    $oldPaths = $snap.Path
+
+    # detect added or modified files
+    foreach ($item in $newSnap) {
+        if ($oldPaths -notcontains $item.Path) {
+            $changed = $true
+            break
+        }
+
+        $oldHash = ($snap | Where-Object { $_.Path -eq $item.Path }).Hash
+        if ($oldHash -ne $item.Hash) {
+            $changed = $true
+            break
+        }
     }
-    # check deleted
+
+    # detect deleted files
     if (-not $changed) {
-        foreach ($s in $snap) {
-            if (-not $joined.ContainsKey($s.Path)) { $changed = $true; break }
+        foreach ($item in $snap) {
+            if ($newPaths -notcontains $item.Path) {
+                $changed = $true
+                break
+            }
         }
     }
 
     if ($changed) {
         try {
             git add -A
-            $time = (Get-Date).ToString("s")
-            git commit -m "Auto: $time" --no-verify 2>$null
-            git push 2>$null
-            Write-Host "Committed & pushed at $time"
-        } catch {
-            Write-Warning "Commit/push failed: $_"
+            $time = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+            git commit -m "Auto commit at $time" --no-verify
+            git push
+
+            Write-Host "Committed and pushed at $time" -ForegroundColor Green
         }
-        $snap = $new
+        catch {
+            Write-Host "Commit or push failed: $($_.Exception.Message)" -ForegroundColor Red
+        }
+
+        $snap = $newSnap
     }
 }
